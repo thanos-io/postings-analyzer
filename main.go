@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/cespare/xxhash/v2"
@@ -16,13 +17,18 @@ import (
 	"github.com/sourcegraph/conc/pool"
 )
 
+var vanillaCounter = atomic.Int32{}
+
 func compress32WithVanillaImpl(data []uint32) []byte {
 	td := os.TempDir()
 
-	f, err := os.Create(filepath.Join(td, "input.bin"))
+	cnt := vanillaCounter.Add(1)
+
+	f, err := os.Create(filepath.Join(td, fmt.Sprintf("input%d.bin", cnt)))
 	if err != nil {
 		panic(err)
 	}
+	defer os.Remove(filepath.Join(td, fmt.Sprintf("input%d.bin", cnt)))
 	defer f.Close()
 
 	bw := bufio.NewWriter(f)
@@ -33,14 +39,17 @@ func compress32WithVanillaImpl(data []uint32) []byte {
 		panic(err)
 	}
 
-	c := exec.Command("/home/giedrius/dev/go-bp/originalimpl", filepath.Join(td, "input.bin"), filepath.Join(td, "output.bin"))
+	c := exec.Command("/home/giedrius/dev/go-bp/originalimpl",
+		filepath.Join(td, fmt.Sprintf("input%d.bin", cnt)), filepath.Join(td, fmt.Sprintf("output%d.bin", cnt)))
 
 	err = c.Run()
 	if err != nil {
 		panic(err)
 	}
 
-	outContent, err := os.ReadFile(filepath.Join(td, "output.bin"))
+	defer os.Remove(filepath.Join(td, fmt.Sprintf("output%d.bin", cnt)))
+
+	outContent, err := os.ReadFile(filepath.Join(td, fmt.Sprintf("output%d.bin", cnt)))
 	if err != nil {
 		panic(err)
 	}
@@ -161,13 +170,13 @@ func main() {
 				}
 
 				rb.RunOptimize()
-				if rb.HasRunCompression() {
-					fmt.Println(lp.refs)
-				}
 
 				roaringOutputRLE, err := rb.ToBytes()
 				if err != nil {
 					panic(err)
+				}
+				if !rb.HasRunCompression() {
+					roaringOutputRLE = []byte{0}
 				}
 
 				s4bp128d4 := compress32WithVanillaImpl(lp.refs)
