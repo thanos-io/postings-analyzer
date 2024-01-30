@@ -109,7 +109,7 @@ Total sum 115764
 Total sum 367533928
 ```
 
-Seems like at least in these cases RB doesn't do RLE because the series IDs in postings have a bit of gap between them. RLE automatically uses RLE if it would benefit from that.
+Seems like at least in these cases RB doesn't do RLE because the series IDs in postings have a bit of gap between them. RLE automatically uses RLE if it would benefit from that. It is possible to imagine a setup where series IDs are constantly increasing. For example, only one target is being scraped with millions of series and no churn.
 
 S4-BP128-D4 is ~2x smaller than RB however RB offers great intersection speed. Quick intersection and merging operations come from the fact that it is enough to bitwise AND/OR the respective containers to get a result.
 
@@ -121,22 +121,21 @@ Interestingly enough, RB inside itself has a galloping intersection algorithm on
 
 Pros of S4-BP128-D4:
 
-- Better compression ratio
-- We do not care about RLE because from my tests I can see that Prometheus doesn't really need it
+- Better compression ratio in tests
 - SIMD oriented data layout
 
 Cons of S4-BP128-D4:
 
-- Slow intersection
+- Basic intersection algorithm
 - No 64 bit implementation
 
 Pros of roaring bitmaps:
 
 - Mature Go implementation
 - Many implementations in other languages
-- Supports 64bits
+- Supports 64 bits
+* Has RLE support which might be useful in some (rare?) setups
 
 Cons of roaring bitmaps:
 
-- Worse compression ratio
-- Has RLE support which we don't really need
+- Worse compression ratio in tests
